@@ -3,7 +3,7 @@ import {generateNonce, getAddressFromPublicKey, isValidISO8601Date} from "./util
 import {SiwpError, SiwpErrorType, SiwpResponse, VerifyOpts, VerifyParams} from "./types";
 import * as uri from 'valid-url';
 import * as etc from '@noble/curves/abstract/utils';
-import { ed25519 } from '@noble/curves/ed25519';
+import { secp256k1 } from '@noble/curves/secp256k1'
 
 export class SiwpMessage {
     /**RFC 3986 URI scheme for the authority that is requesting the signing. */
@@ -155,11 +155,11 @@ export class SiwpMessage {
             }
         }
 
-        /** `chainId` is either mainnet or testnet. */
-        if (this.chainId !== 'mainnet' && this.chainId !== 'testnet') {
+        /** `chainId` is either pocket or pocket-alpha or pocket-beta. */
+        if (!['pocket', 'pocket-alpha', 'pocket-beta'].includes(this.chainId)) {
             throw new SiwpError(
                 SiwpErrorType.INVALID_CHAIN_ID,
-                'mainnet or testnet',
+                'pocket, pocket-alpha or pocket-beta',
                 this.chainId
             );
         }
@@ -186,7 +186,7 @@ export class SiwpMessage {
             this.nonce = generateNonce();
         }
 
-        const chainField = `Chain ID: ` + this.chainId || '1';
+        const chainField = `Chain ID: ` + this.chainId || 'pocket';
 
         const nonceField = `Nonce: ${this.nonce}`;
 
@@ -257,7 +257,6 @@ export class SiwpMessage {
         opts: VerifyOpts = { suppressExceptions: false }
     ): Promise<SiwpResponse> {
         const fail = (response: SiwpResponse) => {
-            console.log(JSON.stringify(response));
             if (opts.suppressExceptions) {
                 return response;
             } else {
@@ -379,7 +378,7 @@ export class SiwpMessage {
         let isValid = false;
 
         try {
-            isValid = ed25519.verify(etc.hexToBytes(signature), new TextEncoder().encode(message), etc.hexToBytes(publicKey));
+            isValid = secp256k1.verify(etc.hexToBytes(signature), new TextEncoder().encode(message), etc.hexToBytes(publicKey));
         } catch (e) {
             const message =
                 e instanceof Error ? e.message : 'Error during signature verification. Please check the signature.';

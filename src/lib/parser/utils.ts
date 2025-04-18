@@ -1,6 +1,3 @@
 export const isValidPocketAddress = (address: string): boolean => {
-    if (address?.length !== 40) {
-        return false;
-    }
-    return true;
+    return /^pokt[ac-hj-np-z0-9]{39}$/.test(address);
 }

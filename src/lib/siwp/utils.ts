@@ -1,4 +1,5 @@
-import { fromUint8Array } from "hex-lite";
+import { ripemd160 } from '@noble/hashes/ripemd160'
+import { toBech32 } from '@cosmjs/encoding'
 
 const ISO8601 =
     /^(?<date>[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01]))[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(.[0-9]+)?(([Zz])|([+|-]([01][0-9]|2[0-3]):[0-5][0-9]))$/;
@@ -82,13 +83,15 @@ function hexStringToByteArray(str: string): Uint8Array {
 }
 
 export const getAddressFromPublicKey = async (publicKey: string): Promise<string> => {
-    // @ts-ignore
-    const hash = await globalThis.crypto.subtle.digest(
+    const bytes = Uint8Array.from(Buffer.from(publicKey, 'hex'));
+    const sha256 = await globalThis.crypto.subtle.digest(
         {
             name: "SHA-256",
         },
-        hexStringToByteArray(publicKey),
+        bytes,
     );
+    // @ts-ignore
+    const addressBytes = ripemd160(sha256);
 
-    return fromUint8Array(new Uint8Array(hash)).slice(0, 40);
+    return toBech32("pokt", addressBytes);
 }
