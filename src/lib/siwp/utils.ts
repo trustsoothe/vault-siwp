@@ -85,13 +85,13 @@ function hexStringToByteArray(str: string): Uint8Array {
 export const getAddressFromPublicKey = async (publicKey: string): Promise<string> => {
     const bytes = Uint8Array.from(Buffer.from(publicKey, 'hex'));
     const sha256 = await globalThis.crypto.subtle.digest(
-        {
-            name: "SHA-256",
-        },
-        bytes,
+      {
+          name: "SHA-256",
+      },
+      bytes,
     );
-    // @ts-ignore
-    const addressBytes = ripemd160(sha256);
+
+    const addressBytes = ripemd160(new Uint8Array(sha256));
 
     return toBech32("pokt", addressBytes);
 }
