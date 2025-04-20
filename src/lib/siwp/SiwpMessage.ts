@@ -4,6 +4,7 @@ import {SiwpError, SiwpErrorType, SiwpResponse, VerifyOpts, VerifyParams} from "
 import * as uri from 'valid-url';
 import * as etc from '@noble/curves/abstract/utils';
 import { secp256k1 } from '@noble/curves/secp256k1'
+import {sha256} from '@noble/hashes/sha256';
 
 export class SiwpMessage {
     /**RFC 3986 URI scheme for the authority that is requesting the signing. */
@@ -378,7 +379,8 @@ export class SiwpMessage {
         let isValid = false;
 
         try {
-            isValid = secp256k1.verify(etc.hexToBytes(signature).subarray(0,64), new TextEncoder().encode(message), etc.hexToBytes(publicKey));
+            const messageHash = sha256(new TextEncoder().encode(message));
+            isValid = secp256k1.verify(etc.hexToBytes(signature).subarray(0,64), messageHash, etc.hexToBytes(publicKey));
         } catch (e) {
             const message =
                 e instanceof Error ? e.message : 'Error during signature verification. Please check the signature.';
