@@ -378,7 +378,7 @@ export class SiwpMessage {
         let isValid = false;
 
         try {
-            isValid = secp256k1.verify(etc.hexToBytes(signature), new TextEncoder().encode(message), etc.hexToBytes(publicKey));
+            isValid = secp256k1.verify(etc.hexToBytes(signature).subarray(0,64), new TextEncoder().encode(message), etc.hexToBytes(publicKey));
         } catch (e) {
             const message =
                 e instanceof Error ? e.message : 'Error during signature verification. Please check the signature.';
