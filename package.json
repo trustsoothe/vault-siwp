@@ -14,7 +14,8 @@
     "lint:fix": "yarn lint --fix",
     "build": "tsc",
     "test": "vitest",
-    "prepare": "yarn build"
+    "prepare": "yarn build",
+    "postinstall": "yarn build"
   },
   "dependencies": {
     "@cosmjs/encoding": "^0.33.1",
