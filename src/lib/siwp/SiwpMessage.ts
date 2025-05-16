@@ -84,6 +84,79 @@ export class SiwpMessage {
     }
 
     /**
+     * Converts a prepared SiwpMessage (result of prepareMessage method)
+     * into a SiwpMessage object by parsing its components
+     * @param message The SIWP message string to convert
+     * @returns {SiwpMessage} A new SiwpMessage instance
+     * @throws {SiwpError} If the message cannot be parsed
+     */
+    public static fromString(message: string): SiwpMessage {
+        try {
+            // Split the message into lines
+            const lines = message.split('\n');
+            const fields: Partial<SiwpMessage> = {};
+
+            // Parse domain and optional scheme from first line
+            const firstLine = lines[0];
+            const domainMatch = firstLine.match(/^(?:(\w+):\/\/)?(.*?) wants you to sign in with your Pocket account:$/);
+            if (domainMatch) {
+                fields.scheme = domainMatch[1];
+                fields.domain = domainMatch[2];
+            }
+
+            // Parse address from second line
+            fields.address = lines[1];
+
+            // Parse statement if present (between address and URI)
+            let statementLines = [];
+            let currentLine = 3;
+            while (currentLine < lines.length && !lines[currentLine].startsWith('URI:')) {
+                if (lines[currentLine]) {
+                    statementLines.push(lines[currentLine]);
+                }
+                currentLine++;
+            }
+            if (statementLines.length > 0) {
+                fields.statement = statementLines.join('\n').trim();
+            }
+
+            // Parse remaining fields
+            for (let i = currentLine; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.startsWith('URI: ')) fields.uri = line.substring(5);
+                else if (line.startsWith('Version: ')) fields.version = line.substring(9);
+                else if (line.startsWith('Chain ID: ')) fields.chainId = line.substring(10) as any;
+                else if (line.startsWith('Nonce: ')) fields.nonce = line.substring(7);
+                else if (line.startsWith('Issued At: ')) fields.issuedAt = line.substring(11);
+                else if (line.startsWith('Expiration Time: ')) fields.expirationTime = line.substring(17);
+                else if (line.startsWith('Not Before: ')) fields.notBefore = line.substring(12);
+                else if (line.startsWith('Request ID: ')) fields.requestId = line.substring(12);
+                else if (line === 'Resources:') {
+                    const resources: string[] = [];
+                    i++;
+                    while (i < lines.length && lines[i].startsWith('- ')) {
+                        resources.push(lines[i].substring(2));
+                        i++;
+                    }
+                    if (resources.length > 0) {
+                        fields.resources = resources;
+                    }
+                    i--;
+                }
+            }
+
+            return new SiwpMessage(fields);
+        } catch (e) {
+            throw new SiwpError(
+              SiwpErrorType.UNABLE_TO_PARSE,
+              'SiwpMessage',
+              message
+            );
+        }
+    }
+
+
+    /**
      * Validates the values of this object fields.
      * @throws Throws an {ErrorType} if a field is invalid.
      */
