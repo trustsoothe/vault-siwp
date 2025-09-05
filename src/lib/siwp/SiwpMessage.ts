@@ -495,9 +495,13 @@ export class SiwpMessage {
                 }
             }
 
+            console.log('Message is still valid. Proceeding with Address Verification.', this);
+
             // 2) Derive address from pubkey and compare
             const pubkeyCompressed = base64ToBytes(publicKey);     // 33 bytes
             const derived = bech32ify('pokt', ripemd160(sha256(pubkeyCompressed)));
+
+            console.log('Derived address: ', derived, 'vs. Message address: ', this.address);
 
             if (derived !== this.address) {
                 return fail({
@@ -510,6 +514,8 @@ export class SiwpMessage {
                     ),
                 });
             }
+
+            console.log('Creating ADR-36 sign-doc over MsgSignData');
 
             // 3) Recreate ADR-36 sign-doc over MsgSignData
             //    NOTE: ADR-36 mandates these exact fields: fee=[], gas="0", account/sequence="0", memo=""
@@ -530,11 +536,25 @@ export class SiwpMessage {
                 ],
             };
 
+            console.log('ADR-36 sign-doc: ', signDoc);
+
+            console.log('Serializing ADR-36 sign-doc');
             const signBytes = serializeSignDoc(signDoc);     // Amino sign bytes
+
+            console.log('ADR-36 sign-bytes: ', signBytes);
+
+            console.log('Signing ADR-36 sign-bytes');
+
             const signHash = sha256(signBytes);         // 32-byte digest
+
+            console.log('ADR-36 sign-hash: ', signHash);
+
+            console.log('Getting signature bytes from base64');
 
             // 4) Verify secp256k1 signature (Keplr returns base64 compact 64-byte (r||s))
             const sig = base64ToBytes(signature);
+
+            console.log('ADR-36 signature bytes: ', sig);
 
             if (sig.length !== 64) {
                 return fail({
