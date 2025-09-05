@@ -417,7 +417,7 @@ export class SiwpMessage {
         };
     }
 
-    async verifyAdr36(input: VerifyAdr36Params, opts: VerifyOpts): Promise<SiwpResponse> {
+    async verifyAdr36(input: VerifyAdr36Params, opts: VerifyOpts = { suppressExceptions: false }): Promise<SiwpResponse> {
         const fail = (response: SiwpResponse) => {
             if (opts.suppressExceptions) {
                 return response;
@@ -430,9 +430,8 @@ export class SiwpMessage {
             const {
                 domain,
                 scheme,
-                signatureB64,
-                pubKeyB64,
-                hrp = "pokt",
+                signature,
+                publicKey,
             } = input;
 
             /** Scheme for domain binding */
@@ -497,8 +496,8 @@ export class SiwpMessage {
             }
 
             // 2) Derive address from pubkey and compare
-            const pubkeyCompressed = base64ToBytes(pubKeyB64);     // 33 bytes
-            const derived = bech32ify(hrp, ripemd160(sha256(pubkeyCompressed)));
+            const pubkeyCompressed = base64ToBytes(publicKey);     // 33 bytes
+            const derived = bech32ify('pokt', ripemd160(sha256(pubkeyCompressed)));
 
             if (derived !== this.address) {
                 return fail({
@@ -535,7 +534,7 @@ export class SiwpMessage {
             const signHash = sha256(signBytes);         // 32-byte digest
 
             // 4) Verify secp256k1 signature (Keplr returns base64 compact 64-byte (r||s))
-            const sig = base64ToBytes(signatureB64);
+            const sig = base64ToBytes(signature);
 
             if (sig.length !== 64) {
                 return fail({

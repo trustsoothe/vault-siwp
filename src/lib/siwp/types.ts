@@ -22,13 +22,10 @@ export interface VerifyERC4361Params {
 
 export interface VerifyAdr36Params {
     /** Base64 signature returned by the wallet (Keplr signArbitrary result.signature) */
-    signatureB64: string;
+    signature: string;
 
     /** Wallet public key base64 (Keplr signArbitrary result.pub_key.value). 33-byte secp256k1 compressed. */
-    pubKeyB64: string;
-
-    /** Bech32 HRP (prefix) to derive & compare the address (default: "pokt") */
-    hrp?: string;
+    publicKey: string;
 
     /** RFC 3986 URI scheme for the authority that is requesting the signing. */
     scheme?: string;
