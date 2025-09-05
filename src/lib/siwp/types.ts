@@ -1,6 +1,6 @@
 import {SiwpMessage} from "./SiwpMessage";
 
-export interface VerifyParams {
+export interface VerifyERC4361Params {
     /** Signature of the message signed by the wallet */
     signature: string;
 
@@ -20,22 +20,34 @@ export interface VerifyParams {
     time?: string;
 }
 
-export const VerifyParamsKeys: Array<keyof VerifyParams> = [
-    'signature',
-    'scheme',
-    'domain',
-    'nonce',
-    'time',
-];
+export interface VerifyAdr36Params {
+    /** Base64 signature returned by the wallet (Keplr signArbitrary result.signature) */
+    signatureB64: string;
+
+    /** Wallet public key base64 (Keplr signArbitrary result.pub_key.value). 33-byte secp256k1 compressed. */
+    pubKeyB64: string;
+
+    /** Bech32 HRP (prefix) to derive & compare the address (default: "pokt") */
+    hrp?: string;
+
+    /** RFC 3986 URI scheme for the authority that is requesting the signing. */
+    scheme?: string;
+
+    /** RFC 4501 dns authority that is requesting the signing. */
+    domain?: string;
+}
+
+export interface VerifyAdr36SiwpResult {
+    success: boolean;
+    reason?: string;
+    derivedAddress?: string;
+}
+
 
 export interface VerifyOpts {
     /** If the library should reject promises on errors, defaults to false */
     suppressExceptions?: boolean;
 }
-
-export const VerifyOptsKeys: Array<keyof VerifyOpts> = [
-    'suppressExceptions',
-];
 
 /**
  * Returned on verifications.

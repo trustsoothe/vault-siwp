@@ -1,5 +1,6 @@
 import { ripemd160 } from '@noble/hashes/ripemd160'
 import { toBech32 } from '@cosmjs/encoding'
+import bech32 from 'bech32';
 
 const ISO8601 =
     /^(?<date>[0-9]{4}-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01]))[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(.[0-9]+)?(([Zz])|([+|-]([01][0-9]|2[0-3]):[0-5][0-9]))$/;
@@ -94,4 +95,22 @@ export const getAddressFromPublicKey = async (publicKey: string): Promise<string
     const addressBytes = ripemd160(new Uint8Array(sha256));
 
     return toBech32("pokt", addressBytes);
+}
+
+export function base64ToBytes(b64: string): Uint8Array {
+    // atob/btoa aren't always available in Node; this works in both Node & modern browsers:
+    if (typeof Buffer !== "undefined") return Buffer.from(b64, "base64");
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+}
+
+export function bech32ify(hrp: string, data: Uint8Array): string {
+    const words = bech32.toWords(data);
+    return bech32.encode(hrp, words);
+}
+
+export function escapeRe(s: string) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

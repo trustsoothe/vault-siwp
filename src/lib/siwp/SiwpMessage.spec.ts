@@ -26,7 +26,7 @@ describe('SiwpMessage', () => {
         });
     });
 
-    describe('#verify', () => {
+    describe('#verifyERC4361', () => {
         const verificationPositiveCases: [string, Record<string, any>][] = Object.entries(verificationPositives);
 
         test.each(verificationPositiveCases)('Verifies message successfully: %s', async (_, testInputObject) => {
@@ -37,7 +37,7 @@ describe('SiwpMessage', () => {
 
             await expect(
                 siwpMessage
-                    .verify({
+                    .verifyERC4361({
                         signature: testInputObject.signature,
                         time: testInputObject.time || testInputObject.issuedAt,
                         publicKey: testInputObject.publicKey,

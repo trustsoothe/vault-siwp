@@ -1,10 +1,18 @@
 import {isValidPocketAddress, ParsedMessage} from "../parser";
-import {generateNonce, getAddressFromPublicKey, isValidISO8601Date} from "./utils";
-import {SiwpError, SiwpErrorType, SiwpResponse, VerifyOpts, VerifyParams} from "./types";
+import {
+    base64ToBytes,
+    bech32ify,
+    generateNonce,
+    getAddressFromPublicKey,
+    isValidISO8601Date
+} from "./utils";
+import {SiwpError, SiwpErrorType, SiwpResponse, VerifyAdr36Params, VerifyERC4361Params, VerifyOpts} from "./types";
 import * as uri from 'valid-url';
 import * as etc from '@noble/curves/abstract/utils';
-import { secp256k1 } from '@noble/curves/secp256k1'
+import {secp256k1} from '@noble/curves/secp256k1'
 import {sha256} from '@noble/hashes/sha256';
+import {ripemd160} from "@noble/hashes/ripemd160";
+import { StdSignDoc, serializeSignDoc } from "@cosmjs/amino";
 
 export class SiwpMessage {
     /**RFC 3986 URI scheme for the authority that is requesting the signing. */
@@ -249,12 +257,12 @@ export class SiwpMessage {
 
     /**
      * Verifies the integrity of the object by matching its signature.
-     * @param params Parameters to verify the integrity of the message, signature is required.
+     * @param params Parameters to verifyERC4361 the integrity of the message, signature is required.
      * @param opts Options for the verification process
-     * @returns {Promise<SiweMessage>} This object if valid.
+     * @returns {Promise<SiwpMessage>} This object if valid.
      */
-    async verify(
-        params: VerifyParams,
+    async verifyERC4361(
+        params: VerifyERC4361Params,
         opts: VerifyOpts = { suppressExceptions: false }
     ): Promise<SiwpResponse> {
         const fail = (response: SiwpResponse) => {
@@ -407,5 +415,162 @@ export class SiwpMessage {
             success: true,
             data: this,
         };
+    }
+
+    async verifyAdr36(input: VerifyAdr36Params, opts: VerifyOpts): Promise<SiwpResponse> {
+        const fail = (response: SiwpResponse) => {
+            if (opts.suppressExceptions) {
+                return response;
+            } else {
+                throw response;
+            }
+        };
+
+        try {
+            const {
+                domain,
+                scheme,
+                signatureB64,
+                pubKeyB64,
+                hrp = "pokt",
+            } = input;
+
+            /** Scheme for domain binding */
+            if (scheme && scheme !== this.scheme) {
+                return fail({
+                    success: false,
+                    data: this,
+                    error: new SiwpError(
+                        SiwpErrorType.SCHEME_MISMATCH,
+                        scheme,
+                        this.scheme
+                    ),
+                });
+            }
+
+            /** Domain binding */
+            if (domain && domain !== this.domain) {
+                return fail({
+                    success: false,
+                    data: this,
+                    error: new SiwpError(
+                        SiwpErrorType.DOMAIN_MISMATCH,
+                        domain,
+                        this.domain
+                    ),
+                });
+            }
+
+            /** Check time or now */
+            const checkTime = new Date();
+
+            /** Message not expired */
+            if (this.expirationTime) {
+                const expirationDate = new Date(this.expirationTime);
+                if (checkTime.getTime() >= expirationDate.getTime()) {
+                    return fail({
+                        success: false,
+                        data: this,
+                        error: new SiwpError(
+                            SiwpErrorType.EXPIRED_MESSAGE,
+                            `${checkTime.toISOString()} < ${expirationDate.toISOString()}`,
+                            `${checkTime.toISOString()} >= ${expirationDate.toISOString()}`
+                        ),
+                    });
+                }
+            }
+
+            /** Message is valid already */
+            if (this.notBefore) {
+                const notBefore = new Date(this.notBefore);
+                if (checkTime.getTime() < notBefore.getTime()) {
+                    return fail({
+                        success: false,
+                        data: this,
+                        error: new SiwpError(
+                            SiwpErrorType.NOT_YET_VALID_MESSAGE,
+                            `${checkTime.toISOString()} >= ${notBefore.toISOString()}`,
+                            `${checkTime.toISOString()} < ${notBefore.toISOString()}`
+                        ),
+                    });
+                }
+            }
+
+            // 2) Derive address from pubkey and compare
+            const pubkeyCompressed = base64ToBytes(pubKeyB64);     // 33 bytes
+            const derived = bech32ify(hrp, ripemd160(sha256(pubkeyCompressed)));
+
+            if (derived !== this.address) {
+                return fail({
+                    success: false,
+                    data: this,
+                    error: new SiwpError(
+                        SiwpErrorType.ADDRESS_MISMATCH,
+                        this.address,
+                        derived,
+                    ),
+                });
+            }
+
+            // 3) Recreate ADR-36 sign-doc over MsgSignData
+            //    NOTE: ADR-36 mandates these exact fields: fee=[], gas="0", account/sequence="0", memo=""
+            const signDoc: StdSignDoc = {
+                chain_id: "",                       // ADR-36
+                account_number: "0",                // ADR-36
+                sequence: "0",                      // ADR-36
+                fee: { amount: [], gas: "0" },      // ADR-36
+                memo: "",                           // ADR-36
+                msgs: [
+                    {
+                        type: "sign/MsgSignData",
+                        value: {
+                            signer: this.address,
+                            data: Buffer.from(new TextEncoder().encode(this.prepareMessage())).toString("base64"),
+                        },
+                    } as any,
+                ],
+            };
+
+            const signBytes = serializeSignDoc(signDoc);     // Amino sign bytes
+            const signHash = sha256(signBytes);         // 32-byte digest
+
+            // 4) Verify secp256k1 signature (Keplr returns base64 compact 64-byte (r||s))
+            const sig = base64ToBytes(signatureB64);
+
+            if (sig.length !== 64) {
+                return fail({
+                    success: false,
+                    data: this,
+                    error: new SiwpError(
+                        SiwpErrorType.INVALID_SIGNATURE,
+                        `Signature must be 64 bytes compact (got ${sig.length}).`,
+                    ),
+                });
+            }
+
+            const ok = secp256k1.verify(sig, signHash, pubkeyCompressed);
+
+            if (!ok) {
+                return fail({
+                    success: false,
+                    data: this,
+                    error: new SiwpError(
+                        SiwpErrorType.INVALID_SIGNATURE,
+                        `Signature does not match the message and public key.`,
+                    ),
+                });
+            }
+
+            return {
+                success: true,
+                data: this,
+            };
+        } catch (e: any) {
+            return fail({
+                success: false,
+                data: this,
+                error: new SiwpError(SiwpErrorType.SIGNATURE_VERIFICATION_ERROR, '', e.message),
+            });
+        }
     }
 }
