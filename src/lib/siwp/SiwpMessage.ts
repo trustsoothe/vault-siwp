@@ -165,7 +165,7 @@ export class SiwpMessage {
         }
 
         /** `chainId` is either pocket or pocket-alpha or pocket-beta. */
-        if (!['pocket', 'pocket-alpha', 'pocket-beta'].includes(this.chainId)) {
+        if (!['pocket', 'pocket-alpha', 'pocket-beta', 'pocket-lego-testnet'].includes(this.chainId)) {
             throw new SiwpError(
                 SiwpErrorType.INVALID_CHAIN_ID,
                 'pocket, pocket-alpha or pocket-beta',
